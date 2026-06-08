@@ -1,7 +1,7 @@
 # Server Configuration File
 
 server_name=my-web-server
-environment=production
+environment=development
 port=80
 region=ap-southeast-1
 log_level=INFO
