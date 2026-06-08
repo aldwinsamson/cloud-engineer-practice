@@ -50,3 +50,7 @@
 - If/else conditions with fi to close
 - For loops with done to close
 - Schedule scripts with crontab -e
+
+## Work in progress - not ready yet
+
+This section is not finished
