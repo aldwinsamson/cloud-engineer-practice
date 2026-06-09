@@ -17,3 +17,13 @@ Thumbs.db
 
 # Node modules if you ever use JavaScript
 node_modules/
+
+# Terraform
+.terraform/
+.terraform.lock.hcl
+*.tfstate
+*.tfstate.backup
+*.tfvars
+crash.log
+override.tf
+override.tf.json
