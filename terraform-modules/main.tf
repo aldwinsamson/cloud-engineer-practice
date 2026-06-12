@@ -84,14 +84,15 @@ resource "aws_instance" "web_server" {
   vpc_security_group_ids      = [aws_security_group.web_sg.id]
   associate_public_ip_address = true
   key_name                    = "my-first-key"
+  iam_instance_profile         = aws_iam_instance_profile.ec2_cloudwatch_profile.name
 
   user_data = <<-EOF
               #!/bin/bash
               yum update -y
-              yum install -y nginx
+              yum install -y nginx amazon-cloudwatch-agent
               systemctl start nginx
               systemctl enable nginx
-              echo "<h1>Hello from Terraform Day 10!</h1>" > /usr/share/nginx/html/index.html
+              echo "<h1>Hello from Terraform Day 11!</h1>" > /usr/share/nginx/html/index.html
               echo "<p>VPC: ${module.vpc.vpc_id}</p>" >> /usr/share/nginx/html/index.html
               echo "<p>Server: $(hostname)</p>" >> /usr/share/nginx/html/index.html
               EOF
@@ -99,4 +100,39 @@ resource "aws_instance" "web_server" {
   tags = {
     Name = "${var.project_name}-web-server"
   }
+}
+
+# IAM Role for CloudWatch Agent
+
+resource "aws_iam_role" "ec2_cloudwatch_role" {
+  name = "${var.project_name}-ec2-cloudwatch-role"
+
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Action = "sts:AssumeRole"
+        Effect = "Allow"
+        Principal = {
+          Service = "ec2.amazonaws.com"
+        }
+      }
+    ]
+  })
+
+  tags = {
+    Name = "${var.project_name}-ec2-cloudwatch-role"
+  }
+}
+
+# Attach the AWS managed CloudWatch Agent policy
+resource "aws_iam_role_policy_attachment" "cloudwatch_agent_policy" {
+  role       = aws_iam_role.ec2_cloudwatch_role.name
+  policy_arn = "arn:aws:iam::aws:policy/CloudWatchAgentServerPolicy"
+}
+
+# Instance profile - this is what actually attaches to the EC2
+resource "aws_iam_instance_profile" "ec2_cloudwatch_profile" {
+  name = "${var.project_name}-ec2-cloudwatch-profile"
+  role = aws_iam_role.ec2_cloudwatch_role.name
 }
