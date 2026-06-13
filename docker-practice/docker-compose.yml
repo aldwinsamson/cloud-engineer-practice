@@ -1,0 +1,17 @@
+version: "3.8"
+services:
+  web:
+    build: .
+    ports:
+      - "5000:5000"
+    environment:
+      - APP_ENV=docker-compose
+    container_name: my-web-app
+
+  web2:
+    build: .
+    ports:
+      - "5001:5000"
+    environment:
+      - APP_ENV=docker-compose-replica
+    container_name: my-web-app-2
