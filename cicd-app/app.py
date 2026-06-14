@@ -23,7 +23,7 @@ class AppHandler(BaseHTTPRequestHandler):
         self.send_response(200)
         self.send_header("Content-type", "application/json")
         self.end_headers()
-        response = {"status": "unhealthy", "version": APP_VERSION}
+        response = {"status": "healthy", "version": APP_VERSION}
         self.wfile.write(json.dumps(response).encode())
 
     def handle_info(self):
