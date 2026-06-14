@@ -1,0 +1,139 @@
+# ============================================
+# CI/CD Pipeline for Cloud Engineering App
+# ============================================
+
+name: Build Test and Deploy
+
+# When does this pipeline run?
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - "cicd-app/**"
+  pull_request:
+    branches:
+      - main
+    paths:
+      - "cicd-app/**"
+
+# Environment variables available to all jobs
+env:
+  AWS_REGION: ap-southeast-1
+  ECR_REPOSITORY: cicd-app
+  IMAGE_TAG: ${{ github.sha }}
+
+jobs:
+  # ==========================================
+  # JOB 1: Run tests
+  # ==========================================
+  test:
+    name: Run Tests
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install test dependencies
+        run: pip install pytest
+
+      - name: Run tests
+        run: |
+          cd cicd-app
+          python -m pytest test_app.py -v --tb=short
+
+      - name: Print test success message
+        run: echo "All tests passed successfully!"
+
+  # ==========================================
+  # JOB 2: Build and push Docker image
+  # Only runs on push to main (not on PRs)
+  # Only runs if tests passed
+  # ==========================================
+  build-and-push:
+    name: Build and Push to ECR
+    runs-on: ubuntu-latest
+    needs: test
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Create ECR repository if it does not exist
+        run: |
+          aws ecr describe-repositories \
+            --repository-names ${{ env.ECR_REPOSITORY }} \
+            --region ${{ env.AWS_REGION }} || \
+          aws ecr create-repository \
+            --repository-name ${{ env.ECR_REPOSITORY }} \
+            --region ${{ env.AWS_REGION }}
+
+      - name: Build Docker image
+        run: |
+          docker build \
+            -t ${{ env.ECR_REPOSITORY }}:${{ env.IMAGE_TAG }} \
+            -t ${{ env.ECR_REPOSITORY }}:latest \
+            ./cicd-app
+
+      - name: Tag image for ECR
+        run: |
+          docker tag \
+            ${{ env.ECR_REPOSITORY }}:${{ env.IMAGE_TAG }} \
+            ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/${{ env.ECR_REPOSITORY }}:${{ env.IMAGE_TAG }}
+
+          docker tag \
+            ${{ env.ECR_REPOSITORY }}:latest \
+            ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/${{ env.ECR_REPOSITORY }}:latest
+
+      - name: Push image to ECR
+        run: |
+          docker push \
+            ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/${{ env.ECR_REPOSITORY }}:${{ env.IMAGE_TAG }}
+
+          docker push \
+            ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/${{ env.ECR_REPOSITORY }}:latest
+
+      - name: Print success message
+        run: |
+          echo "Successfully built and pushed image!"
+          echo "Image URI: ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/${{ env.ECR_REPOSITORY }}:${{ env.IMAGE_TAG }}"
+
+  # ==========================================
+  # JOB 3: Summary
+  # ==========================================
+  summary:
+    name: Pipeline Summary
+    runs-on: ubuntu-latest
+    needs: [test, build-and-push]
+    if: always()
+
+    steps:
+      - name: Print pipeline summary
+        run: |
+          echo "=================================="
+          echo "PIPELINE COMPLETE"
+          echo "=================================="
+          echo "Tests job: ${{ needs.test.result }}"
+          echo "Build job: ${{ needs.build-and-push.result }}"
+          echo "Commit: ${{ github.sha }}"
+          echo "Branch: ${{ github.ref_name }}"
+          echo "Triggered by: ${{ github.actor }}"
+          echo "=================================="
