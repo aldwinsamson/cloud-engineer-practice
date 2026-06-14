@@ -3,7 +3,7 @@ import json
 import os
 import socket
 
-APP_VERSION = "1.0.0"
+APP_VERSION = "1.1.0"
 APP_ENV = os.environ.get("APP_ENV", "development")
 
 class AppHandler(BaseHTTPRequestHandler):
